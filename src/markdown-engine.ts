@@ -181,6 +181,7 @@ export class MarkdownEngine {
    * markdown file path
    */
   private readonly filePath: string;
+  private readonly inputString: string;
   private readonly fileDirectoryPath: string;
   private readonly projectDirectoryPath: string;
 
@@ -220,6 +221,10 @@ export class MarkdownEngine {
      * The markdown file path.
      */
     filePath: string;
+    /**
+     * The string format of markdown file
+     */       
+    inputString: string;
     /**
      * The project directory path.
      */
@@ -2070,6 +2075,79 @@ sidebarTOCBtn.addEventListener('click', function(event) {
     // open in browser
     utility.openFile(info.path);
     return;
+  }
+
+  /**
+   *
+   * @param inputString
+   * @return dest if success, error if failure
+   */
+  public async snippetExport({
+    offline = false,
+    runAllCodeChunks = false,
+  }): Promise<string> {
+    const inputString = this.inputString;
+    let html;
+    let yamlConfig;
+    ({ html, yamlConfig } = await this.parseMD(inputString, {
+      useRelativeFilePath: true,
+      hideFrontMatter: true,
+      isForPreview: false,
+      runAllCodeChunks,
+    }));
+    const htmlConfig = yamlConfig["html"] || {};
+    if ("offline" in htmlConfig) {
+      offline = htmlConfig["offline"];
+    }
+    const embedLocalImages = htmlConfig["embed_local_images"]; // <= embedLocalImages is disabled by default.
+
+    let embedSVG = true; // <= embedSvg is enabled by default.
+    if ("embed_svg" in htmlConfig) {
+      embedSVG = htmlConfig["embed_svg"];
+    }
+
+    let dest = this.filePath;
+    const extname = path.extname(dest);
+    dest = dest.replace(new RegExp(extname + "$"), ".html");
+
+    html = await this.generateSnippetForExport(html, yamlConfig, {
+      isForPrint: false,
+      isForPrince: false,
+      embedLocalImages,
+      offline,
+      embedSVG,
+    });
+
+    // presentation speaker notes
+    // copy dependency files
+    if (
+      !offline &&
+      html.indexOf('[{"src":"revealjs_deps/notes.js","async":true}]') >= 0
+    ) {
+      const depsDirName = path.resolve(path.dirname(dest), "revealjs_deps");
+      if (!fs.existsSync(depsDirName)) {
+        fs.mkdirSync(depsDirName);
+      }
+      fs
+        .createReadStream(
+          path.resolve(
+            extensionDirectoryPath,
+            "./dependencies/reveal/plugin/notes/notes.js",
+          ),
+        )
+        .pipe(fs.createWriteStream(path.resolve(depsDirName, "notes.js")));
+      fs
+        .createReadStream(
+          path.resolve(
+            extensionDirectoryPath,
+            "./dependencies/reveal/plugin/notes/notes.html",
+          ),
+        )
+        .pipe(fs.createWriteStream(path.resolve(depsDirName, "notes.html")));
+    }
+
+    await utility.writeFile(dest, html);
+    return dest;
   }
 
   /**
