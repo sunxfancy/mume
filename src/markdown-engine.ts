@@ -2118,36 +2118,7 @@ sidebarTOCBtn.addEventListener('click', function(event) {
       embedSVG,
     });
 
-    // presentation speaker notes
-    // copy dependency files
-    if (
-      !offline &&
-      html.indexOf('[{"src":"revealjs_deps/notes.js","async":true}]') >= 0
-    ) {
-      const depsDirName = path.resolve(path.dirname(dest), "revealjs_deps");
-      if (!fs.existsSync(depsDirName)) {
-        fs.mkdirSync(depsDirName);
-      }
-      fs
-        .createReadStream(
-          path.resolve(
-            extensionDirectoryPath,
-            "./dependencies/reveal/plugin/notes/notes.js",
-          ),
-        )
-        .pipe(fs.createWriteStream(path.resolve(depsDirName, "notes.js")));
-      fs
-        .createReadStream(
-          path.resolve(
-            extensionDirectoryPath,
-            "./dependencies/reveal/plugin/notes/notes.html",
-          ),
-        )
-        .pipe(fs.createWriteStream(path.resolve(depsDirName, "notes.html")));
-    }
-
-    await utility.writeFile(dest, html);
-    return dest;
+    return html;
   }
 
   /**
