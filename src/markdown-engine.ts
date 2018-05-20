@@ -1475,6 +1475,569 @@ sidebarTOCBtn.addEventListener('click', function(event) {
     return html.trim();
   }
 
+
+  /**
+   * Generate HTML content
+   * @param html: this is the final content you want to put.
+   * @param yamlConfig: this is the front matter.
+   * @param option: HTMLTemplateOption
+   */
+  public async generateSnippetForExport(
+    html: string,
+    yamlConfig = {},
+    options: HTMLTemplateOption,
+  ): Promise<string> {
+    // get `id` and `class`
+    const elementId = yamlConfig["id"] || "";
+    let elementClass = yamlConfig["class"] || [];
+    if (typeof elementClass === "string") {
+      elementClass = [elementClass];
+    }
+    elementClass = elementClass.join(" ");
+
+    // math style and script
+    let mathStyle = "";
+    if (
+      this.config.mathRenderingOption === "MathJax" ||
+      this.config.usePandocParser
+    ) {
+      // TODO
+      const mathJaxConfig = await utility.getMathJaxConfig();
+      mathJaxConfig["tex2jax"]["inlineMath"] = this.config.mathInlineDelimiters;
+      mathJaxConfig["tex2jax"]["displayMath"] = this.config.mathBlockDelimiters;
+
+      if (options.offline) {
+        mathStyle = `
+        <script type="text/x-mathjax-config">
+          MathJax.Hub.Config(${JSON.stringify(mathJaxConfig)});
+        </script>
+        <script type="text/javascript" async src="file:///${path.resolve(
+          extensionDirectoryPath,
+          "./dependencies/mathjax/MathJax.js",
+        )}"></script>
+        `;
+      } else {
+        mathStyle = `
+        <script type="text/x-mathjax-config">
+          MathJax.Hub.Config(${JSON.stringify(mathJaxConfig)});
+        </script>
+        <script type="text/javascript" async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js"></script>
+        `;
+      }
+    } else if (this.config.mathRenderingOption === "KaTeX") {
+      if (options.offline) {
+        mathStyle = `<link rel="stylesheet" href="file:///${path.resolve(
+          extensionDirectoryPath,
+          "./dependencies/katex/katex.min.css",
+        )}">`;
+      } else {
+        mathStyle = `<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.9.0/katex.min.css">`;
+      }
+    } else {
+      mathStyle = "";
+    }
+
+    // font-awesome
+    let fontAwesomeStyle = "";
+    if (html.indexOf('<i class="fa ') >= 0) {
+      if (options.offline) {
+        fontAwesomeStyle = `<link rel="stylesheet" href="file:///${path.resolve(
+          extensionDirectoryPath,
+          `./dependencies/font-awesome/css/font-awesome.min.css`,
+        )}">`;
+      } else {
+        fontAwesomeStyle = `<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">`;
+      }
+    }
+
+    // mermaid
+    let mermaidScript = "";
+    let mermaidStyle = "";
+    let mermaidInitScript = "";
+    if (html.indexOf(' class="mermaid') >= 0) {
+      if (options.offline) {
+        mermaidScript = `<script type="text/javascript" src="file:///${path.resolve(
+          extensionDirectoryPath,
+          "./dependencies/mermaid/mermaid.min.js",
+        )}"></script>`;
+        mermaidStyle = `<link rel="stylesheet" href="file:///${path.resolve(
+          extensionDirectoryPath,
+          `./dependencies/mermaid/${this.config.mermaidTheme}`,
+        )}">`;
+      } else {
+        mermaidScript = `<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/7.0.0/mermaid.min.js"></script>`;
+        mermaidStyle = `<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mermaid/7.0.0/${this.config.mermaidTheme.replace(
+          ".css",
+          ".min.css",
+        )}">`;
+      }
+      const mermaidConfig: string = await utility.getMermaidConfig();
+      mermaidInitScript += `<script>
+${mermaidConfig}
+if (window['MERMAID_CONFIG']) {
+  window['MERMAID_CONFIG'].startOnLoad = false
+  window['MERMAID_CONFIG'].cloneCssStyles = false 
+}
+mermaidAPI.initialize(window['MERMAID_CONFIG'] || {})
+
+if (typeof(window['Reveal']) !== 'undefined') {
+  function mermaidRevealHelper(event) {
+    var currentSlide = event.currentSlide
+    var diagrams = currentSlide.querySelectorAll('.mermaid')
+    for (var i = 0; i < diagrams.length; i++) {
+      var diagram = diagrams[i]
+      if (!diagram.hasAttribute('data-processed')) {
+        mermaid.init(null, diagram, ()=> {
+          Reveal.slide(event.indexh, event.indexv)
+        })
+      }
+    }
+  }
+
+  Reveal.addEventListener('slidechanged', mermaidRevealHelper)
+  Reveal.addEventListener('ready', mermaidRevealHelper)
+} else {
+  mermaid.init(null, document.getElementsByClassName('mermaid'))
+}
+</script>`;
+    }
+    // wavedrom
+    let wavedromScript = ``;
+    let wavedromInitScript = ``;
+    if (html.indexOf(' class="wavedrom') >= 0) {
+      if (options.offline) {
+        wavedromScript += `<script type="text/javascript" src="file:///${path.resolve(
+          utility.extensionDirectoryPath,
+          "./dependencies/wavedrom/default.js",
+        )}"></script>`;
+        wavedromScript += `<script type="text/javascript" src="file:///${path.resolve(
+          utility.extensionDirectoryPath,
+          "./dependencies/wavedrom/wavedrom.min.js",
+        )}"></script>`;
+      } else {
+        wavedromScript += `<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/wavedrom/1.4.1/skins/default.js"></script>`;
+        wavedromScript += `<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/wavedrom/1.4.1/wavedrom.min.js"></script>`;
+      }
+      wavedromInitScript = `<script>WaveDrom.ProcessAll()</script>`;
+    }
+
+    // vega and vega-lite with vega-embed
+    // https://vega.github.io/vega/usage/#embed
+    let vegaScript = ``;
+    let vegaInitScript = ``;
+    if (
+      html.indexOf(' class="vega') >= 0 ||
+      html.indexOf(' class="vega-lite') >= 0
+    ) {
+      if (options.offline) {
+        vegaScript += `<script type="text/javascript" src="file:///${path.resolve(
+          utility.extensionDirectoryPath,
+          `./dependencies/vega/vega.min.js`,
+        )}"></script>`;
+        vegaScript += `<script type="text/javascript" src="file:///${path.resolve(
+          utility.extensionDirectoryPath,
+          `./dependencies/vega-lite/vega-lite.min.js`,
+        )}"></script>`;
+        vegaScript += `<script type="text/javascript" src="file:///${path.resolve(
+          utility.extensionDirectoryPath,
+          `./dependencies/vega-embed/vega-embed.min.js`,
+        )}"></script>`;
+      } else {
+        vegaScript += `<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vega/3.3.1/vega.min.js"></script>`;
+        vegaScript += `<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vega-lite/2.4.0/vega-lite.min.js"></script>`;
+        vegaScript += `<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vega-embed/3.7.2/vega-embed.min.js"></script>`;
+      }
+      vegaInitScript += `<script>
+      var vegaEls = document.querySelectorAll('.vega, .vega-lite');
+      function reportVegaError(el, error) {
+        el.innerHTML = '<pre class="language-text">' + error.toString() + '</pre>'
+      }
+      for (var i = 0; i < vegaEls.length; i++) {
+        const vegaEl = vegaEls[i]
+        try {
+          var spec = JSON.parse(vegaEl.textContent);
+          vegaEmbed(vegaEl, spec, { actions: false, renderer: 'svg' })
+          .catch(function(error) {
+            reportVegaError(vegaEl, error);
+          })
+        } catch (error) {
+          reportVegaError(vegaEl, error);
+        }
+      }
+      </script>`;
+    }
+
+    // flowchart
+    let flowchartScript = ``;
+    let flowchartInitScript = ``;
+    if (html.indexOf(' class="flow') >= 0) {
+      if (options.offline) {
+        flowchartScript += `<script type="text/javascript" src="file:///${path.resolve(
+          utility.extensionDirectoryPath,
+          "./dependencies/raphael/raphael.js",
+        )}"></script>`;
+        flowchartScript += `<script type="text/javascript" src="file:///${path.resolve(
+          utility.extensionDirectoryPath,
+          "./dependencies/flowchart/flowchart.js",
+        )}"></script>`;
+      } else {
+        flowchartScript += `<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>`;
+        flowchartScript += `<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/flowchart/1.7.0/flowchart.min.js"></script>`;
+      }
+      flowchartInitScript = `<script>
+var flowcharts = document.getElementsByClassName('flow')
+for (var i = 0; i < flowcharts.length; i++) {
+  var flow = flowcharts[i]
+  try {
+    var diagram = flowchart.parse(flow.textContent)
+    flow.id = 'flow_' + i
+    flow.innerHTML = ''
+    diagram.drawSVG(flow.id)
+  } catch (error) {
+    flow.innerHTML = '<pre class="language-text">' + error.toString() + '</pre>'
+  }
+}
+</script>`;
+    }
+
+    // sequence diagrams
+    let sequenceDiagramScript = ``;
+    let sequenceDiagramStyle = ``;
+    let sequenceDiagramInitScript = ``;
+    if (html.indexOf(' class="sequence') >= 0) {
+      if (options.offline) {
+        sequenceDiagramScript += `<script type="text/javascript" src="file:///${path.resolve(
+          utility.extensionDirectoryPath,
+          "./dependencies/webfont/webfontloader.js",
+        )}"></script>`;
+        sequenceDiagramScript += `<script type="text/javascript" src="file:///${path.resolve(
+          utility.extensionDirectoryPath,
+          "./dependencies/raphael/raphael.js",
+        )}"></script>`;
+        sequenceDiagramScript += `<script type="text/javascript" src="file:///${path.resolve(
+          utility.extensionDirectoryPath,
+          "./dependencies/underscore/underscore.js",
+        )}"></script>`;
+        sequenceDiagramScript += `<script type="text/javascript" src="file:///${path.resolve(
+          utility.extensionDirectoryPath,
+          "./dependencies/js-sequence-diagrams/sequence-diagram-min.js",
+        )}"></script>`;
+        sequenceDiagramStyle = `<link rel="stylesheet" href="file:///${path.resolve(
+          extensionDirectoryPath,
+          `./dependencies/js-sequence-diagrams/sequence-diagram-min.css`,
+        )}">`;
+      } else {
+        sequenceDiagramScript += `<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/webfont/1.6.28/webfontloader.js"></script>`;
+        sequenceDiagramScript += `<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.2.7/raphael.min.js"></script>`;
+        sequenceDiagramScript += `<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>`;
+        sequenceDiagramScript += `<script type="text/javascript" src="https://bramp.github.io/js-sequence-diagrams/js/sequence-diagram-min.js"></script>`;
+        sequenceDiagramStyle = `<link rel="stylesheet" href="https://bramp.github.io/js-sequence-diagrams/css/sequence-diagram-min.css">`;
+      }
+      sequenceDiagramInitScript = `<script>
+      var sequenceDiagrams = document.getElementsByClassName('sequence')
+      for (var i = 0; i < sequenceDiagrams.length; i++) {
+        var sequence = sequenceDiagrams[i]
+        try {
+          var diagram = Diagram.parse(sequence.textContent)
+          var theme = sequence.getAttribute('theme') || 'simple'
+          sequence.id = 'sequence_' + i
+          sequence.innerHTML = ''
+          diagram.drawSVG(sequence.id, {theme: theme})
+        } catch (error) {
+          sequence.innerHTML = '<pre class="language-text">' + error.toString() + '</pre>'
+        }
+      }
+      </script>`;
+    }
+
+    // presentation
+    let presentationScript = "";
+    let presentationStyle = "";
+    let presentationInitScript = "";
+    if (yamlConfig["isPresentationMode"]) {
+      if (options.offline) {
+        presentationScript = `
+        <script src='file:///${path.resolve(
+          extensionDirectoryPath,
+          "./dependencies/reveal/lib/js/head.min.js",
+        )}'></script>
+        <script src='file:///${path.resolve(
+          extensionDirectoryPath,
+          "./dependencies/reveal/js/reveal.js",
+        )}'></script>`;
+      } else {
+        presentationScript = `
+        <script src='https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.4.1/lib/js/head.min.js'></script>
+        <script src='https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.4.1/js/reveal.min.js'></script>`;
+      }
+
+      const presentationConfig = yamlConfig["presentation"] || {};
+      const dependencies = presentationConfig["dependencies"] || [];
+      if (presentationConfig["enableSpeakerNotes"]) {
+        if (options.offline) {
+          dependencies.push({
+            src: path.resolve(
+              extensionDirectoryPath,
+              "./dependencies/reveal/plugin/notes/notes.js",
+            ),
+            async: true,
+          });
+        } else {
+          dependencies.push({ src: "revealjs_deps/notes.js", async: true }); // TODO: copy notes.js file to corresponding folder
+        }
+      }
+      presentationConfig["dependencies"] = dependencies;
+
+      presentationStyle = `
+      <style>
+      ${fs.readFileSync(
+        path.resolve(
+          extensionDirectoryPath,
+          "./dependencies/reveal/reveal.css",
+        ),
+      )}
+      ${
+        options.isForPrint
+          ? fs.readFileSync(
+              path.resolve(
+                extensionDirectoryPath,
+                "./dependencies/reveal/pdf.css",
+              ),
+            )
+          : ""
+      }
+      </style>
+      `;
+      presentationInitScript = `
+      <script>
+        Reveal.initialize(${JSON.stringify({
+          margin: 0.1,
+          ...presentationConfig,
+        })})
+      </script>
+      `;
+    }
+
+    // prince
+    let princeClass = "";
+    if (options.isForPrince) {
+      princeClass = "prince";
+    }
+
+    // phantomjs
+    let phantomjsClass = "";
+    if (options.phantomjsType) {
+      if (options.phantomjsType === "pdf") {
+        phantomjsClass = "phantomjs-pdf";
+      } else {
+        phantomjsClass = "phantomjs-image";
+      }
+    }
+
+    let title = path.basename(this.filePath);
+    title = title.slice(0, title.length - path.extname(title).length); // remove '.md'
+    if (yamlConfig["title"]) {
+      title = yamlConfig["title"];
+    }
+
+    // prism and preview theme
+    let styleCSS = "";
+    try {
+      // prism *.css
+      styleCSS +=
+        !this.config.printBackground &&
+        !yamlConfig["print_background"] &&
+        !yamlConfig["isPresentationMode"]
+          ? await utility.readFile(
+              path.resolve(
+                extensionDirectoryPath,
+                `./styles/prism_theme/github.css`,
+              ),
+              { encoding: "utf-8" },
+            )
+          : await utility.readFile(
+              path.resolve(
+                extensionDirectoryPath,
+                `./styles/prism_theme/${this.getPrismTheme(
+                  yamlConfig["isPresentationMode"],
+                  yamlConfig,
+                )}`,
+              ),
+              { encoding: "utf-8" },
+            );
+
+      if (yamlConfig["isPresentationMode"]) {
+        styleCSS += await utility.readFile(
+          path.resolve(
+            extensionDirectoryPath,
+            `./styles/revealjs_theme/${
+              yamlConfig["presentation"] &&
+              typeof yamlConfig["presentation"] === "object" &&
+              yamlConfig["presentation"]["theme"]
+                ? yamlConfig["presentation"]["theme"]
+                : this.config.revealjsTheme
+            }`,
+          ),
+          { encoding: "utf-8" },
+        );
+      } else {
+        // preview theme
+        styleCSS +=
+          !this.config.printBackground && !yamlConfig["print_background"]
+            ? await utility.readFile(
+                path.resolve(
+                  extensionDirectoryPath,
+                  `./styles/preview_theme/github-light.css`,
+                ),
+                { encoding: "utf-8" },
+              )
+            : await utility.readFile(
+                path.resolve(
+                  extensionDirectoryPath,
+                  `./styles/preview_theme/${this.config.previewTheme}`,
+                ),
+                { encoding: "utf-8" },
+              );
+      }
+
+      // style template
+      styleCSS += await utility.readFile(
+        path.resolve(extensionDirectoryPath, "./styles/style-template.css"),
+        { encoding: "utf-8" },
+      );
+    } catch (e) {
+      styleCSS = "";
+    }
+
+    // global styles
+    let globalStyles = "";
+    try {
+      globalStyles = await utility.getGlobalStyles();
+    } catch (error) {
+      // ignore it
+    }
+
+    // sidebar toc
+    let sidebarTOC = "";
+    let sidebarTOCScript = "";
+    let sidebarTOCBtn = "";
+    if (
+      this.config.enableScriptExecution &&
+      !yamlConfig["isPresentationMode"] &&
+      !options.isForPrint &&
+      (!("html" in yamlConfig) ||
+        (yamlConfig["html"] && yamlConfig["html"]["toc"] !== false))
+    ) {
+      // enable sidebar toc by default
+      sidebarTOC = `<div class="md-sidebar-toc">${this.tocHTML}</div>`;
+      sidebarTOCBtn = '<a id="sidebar-toc-btn">≡</a>';
+      // toggle sidebar toc
+      // If yamlConfig['html']['toc'], then display sidebar TOC on startup.
+      sidebarTOCScript = `
+<script>
+${
+        yamlConfig["html"] && yamlConfig["html"]["toc"]
+          ? `document.body.setAttribute('html-show-sidebar-toc', true)`
+          : ""
+      }
+var sidebarTOCBtn = document.getElementById('sidebar-toc-btn')
+sidebarTOCBtn.addEventListener('click', function(event) {
+  event.stopPropagation()
+  if (document.body.hasAttribute('html-show-sidebar-toc')) {
+    document.body.removeAttribute('html-show-sidebar-toc')
+  } else {
+    document.body.setAttribute('html-show-sidebar-toc', true)
+  }
+})
+</script>
+      `;
+    }
+
+    // task list script
+    if (html.indexOf("task-list-item-checkbox") >= 0) {
+      const $ = cheerio.load("<div>" + html + "</div>");
+      $(".task-list-item-checkbox").each(
+        (index: number, elem: CheerioElement) => {
+          const $elem = $(elem);
+          let $li = $elem.parent();
+          if (!$li[0].name.match(/^li$/i)) {
+            $li = $li.parent();
+          }
+          if ($li[0].name.match(/^li$/i)) {
+            $li.addClass("task-list-item");
+          }
+        },
+      );
+      html = $.html();
+    }
+
+    // process styles
+    // move @import ''; to the very start.
+    let styles = styleCSS + "\n" + globalStyles;
+    let imports = "";
+    styles = styles.replace(/\@import\s+url\(([^)]+)\)\s*;/g, (whole, url) => {
+      imports += whole + "\n";
+      return "";
+    });
+    styles = imports + styles;
+
+    html = `
+      ${presentationStyle}
+      ${mathStyle}
+      ${mermaidStyle}
+      ${sequenceDiagramStyle}
+      ${fontAwesomeStyle}
+      
+      ${presentationScript}
+      ${mermaidScript}
+      ${wavedromScript}
+      ${vegaScript}
+      ${flowchartScript}
+      ${sequenceDiagramScript}
+      <style> 
+      ${styles} 
+      </style>
+    
+      <div class="mume markdown-preview ${princeClass} ${phantomjsClass} ${elementClass}" ${
+      yamlConfig["isPresentationMode"] ? "data-presentation-mode" : ""
+    } ${elementId ? `id="${elementId}"` : ""}>
+      ${html}
+      </div>
+      ${sidebarTOC}
+      ${sidebarTOCBtn}
+    ${presentationInitScript}
+    ${mermaidInitScript}
+    ${wavedromInitScript}
+    ${vegaInitScript}
+    ${flowchartInitScript}
+    ${sequenceDiagramInitScript}
+    ${sidebarTOCScript}
+    `;
+
+    if (options.embedLocalImages || options.embedSVG) {
+      const $ = cheerio.load(html, { xmlMode: true });
+      if (options.embedLocalImages) {
+        await enhanceWithEmbeddedLocalImages(
+          $,
+          this.config,
+          this.resolveFilePath.bind(this),
+        );
+      }
+      if (options.embedSVG) {
+        await enhanceWithEmbeddedSvgs(
+          $,
+          this.config,
+          this.resolveFilePath.bind(this),
+        );
+      }
+      html = $.html();
+    }
+
+    return html.trim();
+  }
+
+
+
   /**
    * generate HTML file and open it in browser
    */

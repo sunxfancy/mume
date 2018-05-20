@@ -1,6 +1,5 @@
 # MUME
 
-[![Build Status](https://travis-ci.org/shd101wyy/mume.svg?branch=master)](https://travis-ci.org/shd101wyy/mume)
 
 This library powers:
 
@@ -189,7 +188,7 @@ const config = {
   latexEngine: 'pdflatex',
 
   // Enables executing code chunks and importing javascript files.
-  // ⚠ ️ Please use this feature with caution because it may put your security at risk!
+  //    Please use this feature with caution because it may put your security at risk!
   //    Your machine can get hacked if someone makes you open a markdown with malicious code while script execution is enabled.
   enableScriptExecution: false
 }
