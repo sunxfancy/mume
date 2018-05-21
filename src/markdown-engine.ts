@@ -181,7 +181,6 @@ export class MarkdownEngine {
    * markdown file path
    */
   private readonly filePath: string;
-  private readonly inputString: string;
   private readonly fileDirectoryPath: string;
   private readonly projectDirectoryPath: string;
 
@@ -221,10 +220,6 @@ export class MarkdownEngine {
      * The markdown file path.
      */
     filePath: string;
-    /**
-     * The string format of markdown file
-     */       
-    inputString: string;
     /**
      * The project directory path.
      */
