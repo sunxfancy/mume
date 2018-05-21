@@ -1491,7 +1491,7 @@ sidebarTOCBtn.addEventListener('click', function(event) {
     html: string,
     yamlConfig = {},
     options: HTMLTemplateOption,
-  ): Promise<string> {
+  ): Promise<object> {
     // get `id` and `class`
     const elementId = yamlConfig["id"] || "";
     let elementClass = yamlConfig["class"] || [];
@@ -2038,7 +2038,7 @@ sidebarTOCBtn.addEventListener('click', function(event) {
       html = $.html();
     }
 
-    return html.trim();
+    return {html: html.trim(), toc: this.tocHTML, headings: this.headings};
   }
 
 
@@ -2085,8 +2085,10 @@ sidebarTOCBtn.addEventListener('click', function(event) {
   public async snippetExport({
     offline = false,
     runAllCodeChunks = false,
-  }): Promise<string> {
-    const inputString = this.inputString;
+  }): Promise<object> {
+    const inputString = await utility.readFile(this.filePath, {
+      encoding: "utf-8",
+    });
     let html;
     let yamlConfig;
     ({ html, yamlConfig } = await this.parseMD(inputString, {
@@ -2110,7 +2112,7 @@ sidebarTOCBtn.addEventListener('click', function(event) {
     const extname = path.extname(dest);
     dest = dest.replace(new RegExp(extname + "$"), ".html");
 
-    html = await this.generateSnippetForExport(html, yamlConfig, {
+    const ret = await this.generateSnippetForExport(html, yamlConfig, {
       isForPrint: false,
       isForPrince: false,
       embedLocalImages,
@@ -2118,7 +2120,7 @@ sidebarTOCBtn.addEventListener('click', function(event) {
       embedSVG,
     });
 
-    return html;
+    return ret;
   }
 
   /**

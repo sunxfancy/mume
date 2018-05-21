@@ -1,5 +1,6 @@
 # MUME
 
+[TOC]
 
 This library powers:
 
