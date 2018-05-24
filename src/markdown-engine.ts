@@ -1917,42 +1917,6 @@ for (var i = 0; i < flowcharts.length; i++) {
       // ignore it
     }
 
-    // sidebar toc
-    let sidebarTOC = "";
-    let sidebarTOCScript = "";
-    let sidebarTOCBtn = "";
-    if (
-      this.config.enableScriptExecution &&
-      !yamlConfig["isPresentationMode"] &&
-      !options.isForPrint &&
-      (!("html" in yamlConfig) ||
-        (yamlConfig["html"] && yamlConfig["html"]["toc"] !== false))
-    ) {
-      // enable sidebar toc by default
-      sidebarTOC = `<div class="md-sidebar-toc">${this.tocHTML}</div>`;
-      sidebarTOCBtn = '<a id="sidebar-toc-btn">≡</a>';
-      // toggle sidebar toc
-      // If yamlConfig['html']['toc'], then display sidebar TOC on startup.
-      sidebarTOCScript = `
-<script>
-${
-        yamlConfig["html"] && yamlConfig["html"]["toc"]
-          ? `document.body.setAttribute('html-show-sidebar-toc', true)`
-          : ""
-      }
-var sidebarTOCBtn = document.getElementById('sidebar-toc-btn')
-sidebarTOCBtn.addEventListener('click', function(event) {
-  event.stopPropagation()
-  if (document.body.hasAttribute('html-show-sidebar-toc')) {
-    document.body.removeAttribute('html-show-sidebar-toc')
-  } else {
-    document.body.setAttribute('html-show-sidebar-toc', true)
-  }
-})
-</script>
-      `;
-    }
-
     // task list script
     if (html.indexOf("task-list-item-checkbox") >= 0) {
       const $ = cheerio.load("<div>" + html + "</div>");
@@ -2003,15 +1967,12 @@ sidebarTOCBtn.addEventListener('click', function(event) {
     } ${elementId ? `id="${elementId}"` : ""}>
       ${html}
       </div>
-      ${sidebarTOC}
-      ${sidebarTOCBtn}
     ${presentationInitScript}
     ${mermaidInitScript}
     ${wavedromInitScript}
     ${vegaInitScript}
     ${flowchartInitScript}
     ${sequenceDiagramInitScript}
-    ${sidebarTOCScript}
     `;
 
     if (options.embedLocalImages || options.embedSVG) {
