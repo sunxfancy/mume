@@ -155,17 +155,22 @@ export function mkdirp(dir: string): Promise<boolean> {
  * open html file in browser or open pdf file in reader ... etc
  * @param filePath
  */
-export function openFile(filePath) {
-  let cmd;
+export function openFile(filePath: string) {
   if (process.platform === "win32") {
-    cmd = "explorer.exe";
+    if (filePath.match(/^[a-zA-Z]:\\/)) {
+      // C:\ like url.
+      filePath = "file:///" + filePath;
+    }
+    if (filePath.startsWith("file:///")) {
+      return child_process.execFile("explorer.exe", [filePath]);
+    } else {
+      return child_process.exec(`start ${filePath}`);
+    }
   } else if (process.platform === "darwin") {
-    cmd = "open";
+    child_process.execFile("open", [filePath]);
   } else {
-    cmd = "xdg-open";
+    child_process.execFile("xdg-open", [filePath]);
   }
-
-  child_process.execFile(cmd, [filePath]);
 }
 
 /**
@@ -451,14 +456,28 @@ export function isArrayEqual(x, y) {
 }
 
 /**
- * Add file:// to file path
+ * Add file:/// to file path
+ * If it's for VSCode preview, add vscode-resource:/// to file path
  * @param filePath
  */
-export function addFileProtocol(filePath: string): string {
-  if (!filePath.startsWith("file://")) {
-    filePath = "file:///" + filePath;
+export function addFileProtocol(
+  filePath: string,
+  isForVSCodePreview?: boolean,
+): string {
+  if (isForVSCodePreview) {
+    if (!filePath.startsWith("vscode-resource://")) {
+      filePath = "vscode-resource:///" + filePath;
+    }
+    filePath = filePath.replace(
+      /^vscode\-resource\:\/+/,
+      "vscode-resource:///",
+    );
+  } else {
+    if (!filePath.startsWith("file://")) {
+      filePath = "file:///" + filePath;
+    }
+    filePath = filePath.replace(/^file\:\/+/, "file:///");
   }
-  filePath = filePath.replace(/^file\:\/+/, "file:///");
   return filePath;
 }
 
@@ -483,6 +502,7 @@ export function removeFileProtocol(filePath: string): string {
  *
  * files
  */
+// @ts-ignore
 export const configs: {
   globalStyle: string;
   mathjaxConfig: object;

@@ -5,6 +5,7 @@ export interface MarkdownEngineConfig {
   breakOnSingleNewLine?: boolean;
   enableTypographer?: boolean;
   enableWikiLinkSyntax?: boolean;
+  enableLinkify?: boolean;
   wikiLinkFileExtension?: string;
   enableEmojiSyntax?: boolean;
   enableExtendedTableSyntax?: boolean;
@@ -13,6 +14,7 @@ export interface MarkdownEngineConfig {
   mathRenderingOption?: MathRenderingOption;
   mathInlineDelimiters?: string[][];
   mathBlockDelimiters?: string[][];
+  mathRenderingOnlineService?: string;
   codeBlockTheme?: string;
   previewTheme?: string;
   revealjsTheme?: string;
@@ -33,6 +35,7 @@ export const defaultMarkdownEngineConfig: MarkdownEngineConfig = {
   breakOnSingleNewLine: true,
   enableTypographer: false,
   enableWikiLinkSyntax: true,
+  enableLinkify: true,
   enableEmojiSyntax: true,
   enableExtendedTableSyntax: false,
   enableCriticMarkupSyntax: false,
@@ -41,10 +44,11 @@ export const defaultMarkdownEngineConfig: MarkdownEngineConfig = {
   mathRenderingOption: "KaTeX",
   mathInlineDelimiters: [["$", "$"], ["\\(", "\\)"]],
   mathBlockDelimiters: [["$$", "$$"], ["\\[", "\\]"]],
+  mathRenderingOnlineService: "https://latex.codecogs.com/gif.latex",
   codeBlockTheme: "auto.css",
   previewTheme: "github-light.css",
   revealjsTheme: "white.css",
-  mermaidTheme: "mermaid.css",
+  mermaidTheme: "default",
   frontMatterRenderingOption: "none",
   imageFolderPath: "/assets",
   printBackground: false,

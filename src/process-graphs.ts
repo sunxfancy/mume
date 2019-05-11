@@ -4,18 +4,13 @@ import * as path from "path";
 import { compileLaTeX } from "./code-chunk";
 import { CodeChunkData } from "./code-chunk-data";
 import { parseAttributes } from "./lib/attributes";
+import { extractCommandFromBlockInfo } from "./lib/block-info";
 import computeChecksum from "./lib/compute-checksum";
 import { svgElementToPNGFile } from "./magick";
 import * as plantumlAPI from "./puml";
-import * as utility from "./utility";
 import * as vegaAPI from "./vega";
 import * as vegaLiteAPI from "./vega-lite";
-
-/* tslint:disable-next-line:no-var-requires */
-const Viz = require(path.resolve(
-  utility.extensionDirectoryPath,
-  "./dependencies/viz/viz.js",
-));
+import { Viz } from "./viz";
 
 export async function processGraphs(
   text: string,
@@ -211,7 +206,7 @@ export async function processGraphs(
         let svg = graphsCache[checksum];
         if (!svg) {
           const engine = options["engine"] || "dot";
-          svg = Viz(content, { engine });
+          svg = await Viz(content, { engine });
         }
         await convertSVGToPNGFile(
           options["filename"],
@@ -307,7 +302,7 @@ export async function processGraphs(
         const attributes = currentCodeChunk.normalizedInfo.attributes;
         if (attributes["output"] === "html" || attributes["matplotlib"]) {
           // check svg and convert it to png
-          const $ = cheerio.load(currentCodeChunk.result, { xmlMode: true }); // xmlMode here is necessary...
+          const $ = cheerio.load(currentCodeChunk.result); // xmlMode here is necessary...
           const svg = $("svg");
           if (svg.length === 1) {
             const pngFilePath = (await convertSVGToPNGFile(
@@ -320,7 +315,11 @@ export async function processGraphs(
             )).replace(/\\/g, "/");
             result = `![](${pngFilePath})  \n`;
           }
-        } else if (attributes["cmd"].match(/^(la)?tex$/)) {
+        } else if (
+          (
+            extractCommandFromBlockInfo(currentCodeChunk.normalizedInfo) || ""
+          ).match(/^(la)?tex$/)
+        ) {
           // for latex, need to run it again to generate svg file in currect directory.
           result = await compileLaTeX(
             content,

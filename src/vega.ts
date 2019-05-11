@@ -1,8 +1,7 @@
 import * as path from "path";
+import { loader } from "vega-loader";
 import * as YAML from "yamljs";
-
 import * as utility from "./utility";
-
 let vega = null;
 
 async function renderVega(spec: object, baseURL): Promise<string> {
@@ -17,7 +16,7 @@ async function renderVega(spec: object, baseURL): Promise<string> {
 
   async function helper(): Promise<string> {
     const view = new vega.View(vega.parse(spec), {
-      loader: vega.loader({ baseURL }),
+      loader: loader({ baseURL }),
       // logLevel: vega.Warn, // <= this will cause Atom unsafe eval error.
       renderer: "none",
     }).initialize();
